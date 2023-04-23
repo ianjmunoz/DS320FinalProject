@@ -1,0 +1,1428 @@
+---
+title: "Predicting NBA Players Performance"
+author: "Ian Munoz"
+date: "`r Sys.Date()`"
+output: 
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,
+  message = FALSE,
+  warning = FALSE,
+  error = FALSE,
+  fig.align = 'center'
+)
+```
+
+
+## Front Matter
+
+```{r, echo = TRUE}
+remove(list = ls())
+library(dplyr)
+library(ggplot2)
+library(knitr)
+library(kableExtra)
+library(tinytex)
+library(latexpdf)
+library(readr)
+library(tidyr)
+library(rvest)
+library(devtools)
+library(janitor)
+library(ggpubr)
+library(glmnet)
+library(pROC)
+library(e1071)
+library(FNN)
+library(Metrics)
+library(caret)
+```
+
+## Team
+Ian Munoz
+
+
+
+## Introduction
+
+Since the introduction of statistics into sports, analysts have always been trying to find out how to win more games. Many things about a player contribute to their effectiveness. Field goal percentage, passes per game, minutes per game etc. are all attributes that give some sort of insight into a players game. But something that has always interested me, is how features that a player can't change, effect their game. So this projects main focus is answering that question, along with providing other insights into what goes into a players performance.
+
+
+
+
+<br>
+<br>
+<br>
+
+
+## Data Wrangling
+
+To answer this question, I need data that includes all the current NBA players physical features, along with their in game stats. I was not lucky enough to find this exact data in one place. NBA.com had two different datasets that when combined, would give us all the information needed. The first dataset has every player from every season, along with some of their stats. The second dataset contained information about the physical attributes of each player in a given NBA combine (an event where undrafted players showcase their skills before the draft). The website that contained this data was dynamically written. To scrape from the site, it first needed to be saved, and then provide the location of the saved website in my computer as the scraping link. The data collection started at the 2003-2004 combine because the years prior do not have as many current NBA players. After scraping all the years, I combined them into one data frame of all combine players physical data. This dataframe has 1327 cases while the total players dataframe has 4386 cases. There are many more players in the total players dataset because many of the same players are present over many seasons. These duplicates were removed and the two datasets were inner joined by name to give a final dataframe that has 480 unique players with 37 features.
+
+
+
+```{r Scraping combine players}
+#Player Body Measurement data starting with 2003-2004 combine
+
+#2003 - 2004
+fullRoster34 <- read_html(
+  x = ("C:/Users/Ian Munoz/Desktop/184FinalProjWebsites/34N.html")
+) %>%
+  html_elements(css = "table") %>%
+  html_table()
+
+fullRoster34T <- fullRoster34[[1]]
+
+#2004 - 2005
+fullRoster45 <- read_html(
+  x = "C:/Users/Ian Munoz/Desktop/184FinalProjWebsites/45N.html"
+) %>%
+  html_elements(css = "table") %>%
+  html_table()
+
+fullRoster45T <- fullRoster45[[1]]
+
+fullRosterFinal <- rbind(fullRoster34T, fullRoster45T)
+
+#2005 - 2006
+fullRoster56 <- read_html(
+  x = "C:/Users/Ian Munoz/Desktop/184FinalProjWebsites/56N.html"
+) %>%
+  html_elements(css = "table") %>%
+  html_table()
+
+fullRoster56T <- fullRoster56[[1]]
+
+fullRosterFinal <- rbind(fullRosterFinal, fullRoster56T)
+
+#2006 - 2007
+fullRoster67 <- read_html(
+  x = "C:/Users/Ian Munoz/Desktop/184FinalProjWebsites/67N.html"
+) %>%
+  html_elements(css = "table") %>%
+  html_table()
+
+fullRoster67T <- fullRoster67[[1]]
+
+fullRosterFinal <- rbind(fullRosterFinal, fullRoster67T)
+
+#2007 - 2008
+fullRoster78 <- read_html(
+  x = "C:/Users/Ian Munoz/Desktop/184FinalProjWebsites/78N.html"
+) %>%
+  html_elements(css = "table") %>%
+  html_table()
+
+fullRoster78T <- fullRoster78[[1]]
+
+fullRosterFinal <- rbind(fullRosterFinal, fullRoster78T)
+
+# 2008 - 2009 
+fullRoster89 <- read_html(
+  x = "C:/Users/Ian Munoz/Desktop/184FinalProjWebsites/89N.html"
+) %>%
+  html_elements(css = "table") %>%
+  html_table()
+
+fullRoster89T <- fullRoster89[[1]]
+
+fullRosterFinal <- rbind(fullRosterFinal, fullRoster89T)
+
+
+# 2009 - 2010
+fullRoster910 <- read_html(
+  x = "C:/Users/Ian Munoz/Desktop/184FinalProjWebsites/910N.html"
+) %>%
+  html_elements(css = "table") %>%
+  html_table()
+
+fullRoster910T <- fullRoster910[[1]]
+
+fullRosterFinal <- rbind(fullRosterFinal, fullRoster910T)
+
+#2010 - 2011
+fullRoster1011 <- read_html(
+  x = "C:/Users/Ian Munoz/Desktop/184FinalProjWebsites/1011N.html"
+) %>%
+  html_elements(css = "table") %>%
+  html_table()
+
+fullRoster1011T <- fullRoster1011[[1]]
+
+fullRosterFinal <- rbind(fullRosterFinal, fullRoster1011T)
+
+#2011 - 2012
+fullRoster1112 <- read_html(
+  x = "C:/Users/Ian Munoz/Desktop/184FinalProjWebsites/1112N.html"
+) %>%
+  html_elements(css = "table") %>%
+  html_table()
+
+fullRoster1112T <- fullRoster1112[[1]]
+
+fullRosterFinal <- rbind(fullRosterFinal, fullRoster1112T)
+
+# 2012 - 2013
+fullRoster1213 <- read_html(
+  x = "C:/Users/Ian Munoz/Desktop/184FinalProjWebsites/1213N.html"
+) %>%
+  html_elements(css = "table") %>%
+  html_table()
+
+fullRoster1213T <- fullRoster1213[[1]]
+
+fullRosterFinal <- rbind(fullRosterFinal, fullRoster1213T)
+
+#2013 - 2014
+fullRoster1314 <- read_html(
+  x = "C:/Users/Ian Munoz/Desktop/184FinalProjWebsites/1314N.html"
+) %>%
+  html_elements(css = "table") %>%
+  html_table()
+
+fullRoster1314T <- fullRoster1314[[1]]
+
+fullRosterFinal <- rbind(fullRosterFinal, fullRoster1314T)
+
+#2014 - 2015
+fullRoster1415 <- read_html(
+  x = "C:/Users/Ian Munoz/Desktop/184FinalProjWebsites/1415N.html"
+) %>%
+  html_elements(css = "table") %>%
+  html_table()
+
+fullRoster1415T <- fullRoster1415[[1]]
+
+fullRosterFinal <- rbind(fullRosterFinal, fullRoster1415T)
+
+#2015-2016
+fullRoster1516 <- read_html(
+  x = "C:/Users/Ian Munoz/Desktop/184FinalProjWebsites/1516N.html"
+) %>%
+  html_elements(css = "table") %>%
+  html_table()
+
+fullRoster1516T <- fullRoster1516[[1]]
+
+fullRosterFinal <- rbind(fullRosterFinal, fullRoster1516T)
+
+#2016 - 2017
+fullRoster1617 <- read_html(
+  x = "C:/Users/Ian Munoz/Desktop/184FinalProjWebsites/1617N.html"
+) %>%
+  html_elements(css = "table") %>%
+  html_table()
+
+fullRoster1617T <- fullRoster1617[[1]]
+
+fullRosterFinal <- rbind(fullRosterFinal, fullRoster1617T)
+
+#2017 - 2018
+fullRoster1718 <- read_html(
+  x = "C:/Users/Ian Munoz/Desktop/184FinalProjWebsites/1718N.html"
+) %>%
+  html_elements(css = "table") %>%
+  html_table()
+
+fullRoster1718T <- fullRoster1718[[1]]
+
+fullRosterFinal <- rbind(fullRosterFinal, fullRoster1718T)
+
+# 2018 - 2019
+fullRoster1819 <- read_html(
+  x = "C:/Users/Ian Munoz/Desktop/184FinalProjWebsites/1819N.html"
+) %>%
+  html_elements(css = "table") %>%
+  html_table()
+
+fullRoster1819T <- fullRoster1819[[1]]
+
+fullRosterFinal <- rbind(fullRosterFinal, fullRoster1819T)
+
+#2019 - 2020
+fullRoster1920 <- read_html(
+  x = "C:/Users/Ian Munoz/Desktop/184FinalProjWebsites/1920N.html"
+) %>%
+  html_elements(css = "table") %>%
+  html_table()
+
+fullRoster1920T <- fullRoster1920[[1]]
+
+fullRosterFinal <- rbind(fullRosterFinal, fullRoster1920T)
+
+# 2020 - 2021
+fullRoster2021 <- read_html(
+  x = "C:/Users/Ian Munoz/Desktop/184FinalProjWebsites/2021N.html"
+) %>%
+  html_elements(css = "table") %>%
+  html_table()
+
+fullRoster2021T <- fullRoster2021[[1]]
+
+fullRosterFinal <- rbind(fullRosterFinal, fullRoster2021T)
+
+#2021 - 2022
+fullRoster2122 <- read_html(
+  x = "C:/Users/Ian Munoz/Desktop/184FinalProjWebsites/2122N.html"
+) %>%
+  html_elements(css = "table") %>%
+  html_table()
+
+fullRoster2122T <- fullRoster2122[[1]]
+
+fullRosterFinal <- rbind(fullRosterFinal, fullRoster2122T)
+
+#2022 - 2023
+fullRoster2223 <- read_html(
+  x = "C:/Users/Ian Munoz/Desktop/184FinalProjWebsites/2223N.html"
+) %>%
+  html_elements(css = "table") %>%
+  html_table()
+
+fullRoster2223T <- fullRoster2223[[1]]
+
+fullRosterFinal <- rbind(fullRosterFinal, fullRoster2223T)
+
+```
+
+```{r}
+fullRosterFinal <- (fullRosterFinal[!duplicated(fullRosterFinal$Player), ])
+```
+
+
+
+
+```{r Scraping Player In-Game Attributes}
+#Player in game stats starting with 2003-2004 season
+
+
+#2003 - 2004
+combine34 <- read_html(
+  x = ("C:/Users/Ian Munoz/Desktop/184FinalProjWebsites/34.html")
+) %>%
+  html_elements(css = "table") %>%
+  html_table()
+
+combine34T <- combine34[[1]]
+
+#2004 - 2005
+combine45 <- read_html(
+  x = "C:/Users/Ian Munoz/Desktop/184FinalProjWebsites/45.html"
+) %>%
+  html_elements(css = "table") %>%
+  html_table()
+
+combine45T <- combine45[[1]]
+
+combineFinal <- rbind(combine34T, combine45T)
+
+#2005 - 2006
+combine56 <- read_html(
+  x = "C:/Users/Ian Munoz/Desktop/184FinalProjWebsites/56.html"
+) %>%
+  html_elements(css = "table") %>%
+  html_table()
+
+combine56T <- combine56[[1]]
+
+combineFinal <- rbind(combineFinal, combine56T)
+
+#2006 - 2007
+combine67 <- read_html(
+  x = "C:/Users/Ian Munoz/Desktop/184FinalProjWebsites/67.html"
+) %>%
+  html_elements(css = "table") %>%
+  html_table()
+
+combine67T <- combine67[[1]]
+
+combineFinal <- rbind(combineFinal, combine67T)
+
+#2007 - 2008
+combine78 <- read_html(
+  x = "C:/Users/Ian Munoz/Desktop/184FinalProjWebsites/78.html"
+) %>%
+  html_elements(css = "table") %>%
+  html_table()
+
+combine78T <- combine78[[1]]
+
+combineFinal <- rbind(combineFinal, combine78T)
+
+# 2008 - 2009 
+combine89 <- read_html(
+  x = "C:/Users/Ian Munoz/Desktop/184FinalProjWebsites/89.html"
+) %>%
+  html_elements(css = "table") %>%
+  html_table()
+
+combine89T <- combine89[[1]]
+
+combineFinal <- rbind(combineFinal, combine89T)
+
+
+# 2009 - 2010
+combine910 <- read_html(
+  x = "C:/Users/Ian Munoz/Desktop/184FinalProjWebsites/910.html"
+) %>%
+  html_elements(css = "table") %>%
+  html_table()
+
+combine910T <- combine910[[1]]
+
+combineFinal <- rbind(combineFinal, combine910T)
+
+#2010 - 2011
+combine1011 <- read_html(
+  x = "C:/Users/Ian Munoz/Desktop/184FinalProjWebsites/1011.html"
+) %>%
+  html_elements(css = "table") %>%
+  html_table()
+
+combine1011T <- combine1011[[1]]
+
+combineFinal <- rbind(combineFinal, combine1011T)
+
+#2011 - 2012
+combine1112 <- read_html(
+  x = "C:/Users/Ian Munoz/Desktop/184FinalProjWebsites/1112.html"
+) %>%
+  html_elements(css = "table") %>%
+  html_table()
+
+combine1112T <- combine1112[[1]]
+
+combineFinal <- rbind(combineFinal, combine1112T)
+
+# 2012 - 2013
+combine1213 <- read_html(
+  x = "C:/Users/Ian Munoz/Desktop/184FinalProjWebsites/1213.html"
+) %>%
+  html_elements(css = "table") %>%
+  html_table()
+
+combine1213T <- combine1213[[1]]
+
+combineFinal <- rbind(combineFinal, combine1213T)
+
+#2013 - 2014
+combine1314 <- read_html(
+  x = "C:/Users/Ian Munoz/Desktop/184FinalProjWebsites/1314.html"
+) %>%
+  html_elements(css = "table") %>%
+  html_table()
+
+combine1314T <- combine1314[[1]]
+
+combineFinal <- rbind(combineFinal, combine1314T)
+
+#2014 - 2015
+combine1415 <- read_html(
+  x = "C:/Users/Ian Munoz/Desktop/184FinalProjWebsites/1415.html"
+) %>%
+  html_elements(css = "table") %>%
+  html_table()
+
+combine1415T <- combine1415[[1]]
+
+combineFinal <- rbind(combineFinal, combine1415T)
+
+#2015-2016
+combine1516 <- read_html(
+  x = "C:/Users/Ian Munoz/Desktop/184FinalProjWebsites/1516.html"
+) %>%
+  html_elements(css = "table") %>%
+  html_table()
+
+combine1516T <- combine1516[[1]]
+
+combineFinal <- rbind(combineFinal, combine1516T)
+
+#2016 - 2017
+combine1617 <- read_html(
+  x = "C:/Users/Ian Munoz/Desktop/184FinalProjWebsites/1617.html"
+) %>%
+  html_elements(css = "table") %>%
+  html_table()
+
+combine1617T <- combine1617[[1]]
+
+combineFinal <- rbind(combineFinal, combine1617T)
+
+#2017 - 2018
+combine1718 <- read_html(
+  x = "C:/Users/Ian Munoz/Desktop/184FinalProjWebsites/1718.html"
+) %>%
+  html_elements(css = "table") %>%
+  html_table()
+
+combine1718T <- combine1718[[1]]
+
+combineFinal <- rbind(combineFinal, combine1718T)
+
+# 2018 - 2019
+combine1819 <- read_html(
+  x = "C:/Users/Ian Munoz/Desktop/184FinalProjWebsites/1819.html"
+) %>%
+  html_elements(css = "table") %>%
+  html_table()
+
+combine1819T <- combine1819[[1]]
+
+combineFinal <- rbind(combineFinal, combine1819T)
+
+#2019 - 2020
+combine1920 <- read_html(
+  x = "C:/Users/Ian Munoz/Desktop/184FinalProjWebsites/1920.html"
+) %>%
+  html_elements(css = "table") %>%
+  html_table()
+
+combine1920T <- combine1920[[1]]
+
+combineFinal <- rbind(combineFinal, combine1920T)
+
+# 2020 - 2021
+combine2021 <- read_html(
+  x = "C:/Users/Ian Munoz/Desktop/184FinalProjWebsites/2021.html"
+) %>%
+  html_elements(css = "table") %>%
+  html_table()
+
+combine2021T <- combine2021[[1]]
+
+combineFinal <- rbind(combineFinal, combine2021T)
+
+#2021 - 2022
+combine2122 <- read_html(
+  x = "C:/Users/Ian Munoz/Desktop/184FinalProjWebsites/2122.html"
+) %>%
+  html_elements(css = "table") %>%
+  html_table()
+
+combine2122T <- combine2122[[1]]
+
+combineFinal <- rbind(combineFinal, combine2122T)
+
+#2022 - 2023
+combine2223 <- read_html(
+  x = "C:/Users/Ian Munoz/Desktop/184FinalProjWebsites/2223.html"
+) %>%
+  html_elements(css = "table") %>%
+  html_table()
+
+combine2223T <- combine2223[[1]]
+
+combineFinal <- rbind(combineFinal, combine2223T)
+
+```
+
+
+```{r}
+combineFinal <- combineFinal %>%
+  na.omit()
+```
+
+
+
+```{r Join}
+#joining two datasets by players name
+FinalTable <- inner_join(
+  x = fullRosterFinal,
+  y = combineFinal,
+  by = c("Player" = "PLAYER")
+)
+```
+
+## Data Cleaning
+The main issues with this dataset was that some of the columns that were supposed to be numeric, weren't. I changed those columns to numeric and I also renamed some columns to a more standard name. Also, some players had multiple positions listed so I split them into two values and just chose the first position listed.
+
+```{r}
+#Renaming variables
+FinalTable <- rename(FinalTable, PPG = PTS)
+FinalTable <- rename(FinalTable, RPG = REB)
+FinalTable <- rename(FinalTable, APG = AST)
+FinalTable <- rename(FinalTable, SPG = STL)
+FinalTable <- rename(FinalTable, TO. = TOV)
+FinalTable <- rename(FinalTable, BPG = BLK)
+```
+
+
+
+
+
+
+```{r wrangling data in numeric and proper postions}
+
+#standing reach
+FinalTable1 <- FinalTable %>%
+  separate(
+    col = `STANDING REACH`,
+    into = c("feet", "inches"),
+    sep = "' "
+  ) %>%
+  mutate(
+    across(.cols = c("feet", "inches"), .fns = parse_number),
+    standReach = 12*feet + inches
+  ) %>%
+  select( -c("feet", "inches"))
+
+#wingspan
+FinalTable1 <- FinalTable1 %>%
+  separate(
+    col = WINGSPAN,
+    into = c("feet", "inches"),
+    sep = "' "
+  ) %>%
+  mutate(
+    across(.cols = c("feet", "inches"), .fns = parse_number),
+    Wingspan = 12*feet + inches
+  ) %>%
+  select( -c("feet", "inches"))
+
+#height
+FinalTable1 <- FinalTable1 %>%
+  separate(
+    col = `HEIGHT W/ SHOES`,
+    into = c("feet", "inches"),
+    sep = "' "
+  ) %>%
+  mutate(
+    across(.cols = c("feet", "inches"), .fns = parse_number),
+    Height = 12*feet + inches
+  ) %>%
+  select( -c("feet", "inches","HEIGHT W/O SHOES"))
+
+#hand length to numeric
+FinalTable1$`HAND LENGTH (inches)` <- as.numeric(FinalTable1$`HAND LENGTH (inches)`)
+
+#hand width to numeric
+FinalTable1$`HAND WIDTH (inches)` <- as.numeric(FinalTable1$`HAND WIDTH (inches)`)
+
+#Weight to numeric
+FinalTable1$`WEIGHT (LBS)` <- as.numeric(FinalTable1$`WEIGHT (LBS)`)
+
+
+```
+
+
+
+```{r}
+#seperate postion
+FinalTable1 <- FinalTable1 %>%
+  separate(
+    col = POS,
+    into = c("POS", "two"),
+    sep = "-"
+  ) %>%
+  select( -c("two"))
+
+```
+
+```{r}
+#creating indicator variables to represent each position
+FinalTable1 <- FinalTable1 %>%
+  mutate(PG = ifelse(POS == "PG", 1, 0),
+         SG = ifelse(POS == "SG", 1, 0),
+         SF = ifelse(POS == "SF", 1, 0),
+         PF = ifelse(POS == "PF", 1, 0),
+         C = ifelse(POS == "C", 1, 0))
+```
+
+
+
+```{r Summary Table RPG}
+
+
+#make summary table for rpg
+FinalTable1SumRpg <- FinalTable1 %>%
+  subset(POS == "PG" | POS == "SG" | POS == "SF" | POS == "PF" | POS == "C") %>%
+  #sorts all by the position
+  group_by(POS) %>%
+  # select rebounds per game
+  select(POS, RPG) %>%
+  # summarize function for wanted info below
+  summarize(
+    across(
+      .cols = where(is.numeric),
+      .fns = list(
+        min = ~min(.x, na.rm = TRUE),
+        Q1 = ~quantile(.x, probs = 0.25, na.rm = TRUE),
+        median = ~median(.x, na.rm = TRUE),
+        Q3 = ~quantile(.x, probs = 0.75, na.rm = TRUE),
+        max = ~max(.x, na.rm = TRUE),
+        mean = ~mean(.x, na.rm = TRUE),
+        sasd = ~sd(.x, na.rm = TRUE)
+      )
+    )
+  )
+# gives columns names 
+colnames(FinalTable1SumRpg) <- c('POS','min','Q1','Median','Q3','Max','Mean','SD','n')
+
+FinalTable1SumRpg %>%
+  kable(
+    caption = "NBA Reounds per Game (RPG) per position",
+    booktabs = TRUE,
+    align = c("l", rep("c", 6)),
+    digits = 2
+  ) %>%
+  kableExtra::kable_styling(
+    bootstrap_options = c("striped", "condensed"),
+    font_size = 16
+  )
+
+```
+
+Figure 1: Summary statistics of rebounds per game grouped by position
+
+```{r Summary Table BPG}
+#bpg
+FinalTable1SumBpg <- FinalTable1 %>%
+  subset(POS == "PG" | POS == "SG" | POS == "SF" | POS == "PF" | POS == "C") %>%
+  group_by(POS) %>%
+  select(POS, BPG) %>%
+  summarize(
+    across(
+      .cols = where(is.numeric),
+      .fns = list(
+        min = ~min(.x, na.rm = TRUE),
+        Q1 = ~quantile(.x, probs = 0.25, na.rm = TRUE),
+        median = ~median(.x, na.rm = TRUE),
+        Q3 = ~quantile(.x, probs = 0.75, na.rm = TRUE),
+        max = ~max(.x, na.rm = TRUE),
+        mean = ~mean(.x, na.rm = TRUE),
+        sasd = ~sd(.x, na.rm = TRUE)
+      )
+    )
+  )
+colnames(FinalTable1SumBpg) <- c('POS','min','Q1','Median','Q3','Max','Mean','SD','n')
+
+FinalTable1SumBpg %>%
+  kable(
+    caption = "NBA Blocks per Game (BPG) per position",
+    booktabs = TRUE,
+    align = c("l", rep("c", 6)),
+    digits = 2
+  ) %>%
+  kableExtra::kable_styling(
+    bootstrap_options = c("striped", "condensed"),
+    font_size = 16
+  )
+
+```
+
+Figure 2: Summary statistics of blocks per game grouped by position
+```{r Summary Table PPG}
+#ppg
+FinalTable1SumPpg <- FinalTable1 %>%
+  subset(POS == "PG" | POS == "SG" | POS == "SF" | POS == "PF" | POS == "C") %>%
+  group_by(POS) %>%
+  select(POS, PPG) %>%
+  summarize(
+    across(
+      .cols = where(is.numeric),
+      .fns = list(
+        min = ~min(.x, na.rm = TRUE),
+        Q1 = ~quantile(.x, probs = 0.25, na.rm = TRUE),
+        median = ~median(.x, na.rm = TRUE),
+        Q3 = ~quantile(.x, probs = 0.75, na.rm = TRUE),
+        max = ~max(.x, na.rm = TRUE),
+        mean = ~mean(.x, na.rm = TRUE),
+        sasd = ~sd(.x, na.rm = TRUE)
+      )
+    )
+  )
+colnames(FinalTable1SumPpg) <- c('POS','min','Q1','Median','Q3','Max','Mean','SD','n')
+
+FinalTable1SumPpg %>%
+  kable(
+    caption = "NBA Points per Game (PPG) per position",
+    booktabs = TRUE,
+    align = c("l", rep("c", 6)),
+    digits = 2
+  ) %>%
+  kableExtra::kable_styling(
+    bootstrap_options = c("striped", "condensed"),
+    font_size = 16
+  )
+
+```
+Figure 3: Summary statistics of points per game grouped by position
+```{r Summary Table APG}
+#apg
+FinalTable1SumApg <- FinalTable1 %>%
+  subset(POS == "PG" | POS == "SG" | POS == "SF" | POS == "PF" | POS == "C") %>%
+  group_by(POS) %>%
+  select(POS, APG) %>%
+  summarize(
+    across(
+      .cols = where(is.numeric),
+      .fns = list(
+        min = ~min(.x, na.rm = TRUE),
+        Q1 = ~quantile(.x, probs = 0.25, na.rm = TRUE),
+        median = ~median(.x, na.rm = TRUE),
+        Q3 = ~quantile(.x, probs = 0.75, na.rm = TRUE),
+        max = ~max(.x, na.rm = TRUE),
+        mean = ~mean(.x, na.rm = TRUE),
+        sasd = ~sd(.x, na.rm = TRUE)
+      )
+    )
+  )
+colnames(FinalTable1SumApg) <- c('POS','min','Q1','Median','Q3','Max','Mean','SD','n')
+
+FinalTable1SumApg %>%
+  kable(
+    caption = "NBA Assists per Game (APG) per position",
+    booktabs = TRUE,
+    align = c("l", rep("c", 6)),
+    digits = 2
+  ) %>%
+  kableExtra::kable_styling(
+    bootstrap_options = c("striped", "condensed"),
+    font_size = 16
+  )
+
+```
+Figure 4: Summary statistics of assists per game grouped by position
+```{r Summary Table SPG}
+#spg
+FinalTable1SumSpg <- FinalTable1 %>%
+  subset(POS == "PG" | POS == "SG" | POS == "SF" | POS == "PF" | POS == "C") %>%
+  group_by(POS) %>%
+  select(POS, SPG) %>%
+  summarize(
+    across(
+      .cols = where(is.numeric),
+      .fns = list(
+        min = ~min(.x, na.rm = TRUE),
+        Q1 = ~quantile(.x, probs = 0.25, na.rm = TRUE),
+        median = ~median(.x, na.rm = TRUE),
+        Q3 = ~quantile(.x, probs = 0.75, na.rm = TRUE),
+        max = ~max(.x, na.rm = TRUE),
+        mean = ~mean(.x, na.rm = TRUE),
+        sasd = ~sd(.x, na.rm = TRUE)
+      )
+    )
+  )
+colnames(FinalTable1SumSpg) <- c('POS','min','Q1','Median','Q3','Max','Mean','SD','n')
+
+FinalTable1SumBpg %>%
+  kable(
+    caption = "NBA Steals per Game (SPG) per position",
+    booktabs = TRUE,
+    align = c("l", rep("c", 6)),
+    digits = 2
+  ) %>%
+  kableExtra::kable_styling(
+    bootstrap_options = c("striped", "condensed"),
+    font_size = 16
+  )
+```
+Figure 5: Summary statistics of steals per game grouped by position
+
+Before fitting a regression model to predict certain features, I want to see which features are correlated with each other. I don't want to train a model on features that have no correlation with the predictor. To see how features are related, I created a heat map.
+```{r regression model}
+# Corrplot
+library(corrplot)
+cors <- cor(FinalTable1[, c("WEIGHT (LBS)","standReach", "Wingspan", "Height", "RPG", "BPG", "PPG","APG","SPG")], use = "pairwise.complete.obs")
+
+corTest <- cor.mtest(FinalTable1[, c("WEIGHT (LBS)","standReach", "Wingspan", "Height", "RPG","BPG","PPG","APG","SPG")])
+# 0 means significant
+corrplot(cors,method = "color", type = "lower")
+
+
+```
+
+Figure 6: Correlation matrix
+
+
+```{r regression summary with R-SQ}
+# Fit a regression RPG
+RPGRegression <- lm(
+  data = FinalTable1,
+  formula = RPG ~ Height + Wingspan + standReach + `WEIGHT (LBS)`
+)
+
+#BPG
+BPGRegression <- lm(
+  data = FinalTable1,
+  formula = BPG ~ Height + Wingspan + standReach + `WEIGHT (LBS)`
+)
+
+# PPG
+PPGRegression <- lm(
+  data = FinalTable1,
+  formula = PPG ~ Height + Wingspan + standReach + `WEIGHT (LBS)`
+)
+
+# APG
+APGRegression <- lm(
+  data = FinalTable1,
+  formula = APG ~ Height + Wingspan + standReach + `WEIGHT (LBS)`
+)
+
+# SPG
+SPGRegression <- lm(
+  data = FinalTable1,
+  formula = SPG ~ Height + Wingspan + standReach + `WEIGHT (LBS)`
+)
+
+```
+
+
+```{r}
+test <- summary(SPGRegression)$coefficients
+
+testdf <- data.frame(test)
+testdf %>%
+  kable(
+    caption = "Coefficients of Steals Per Game as Predictor",
+    booktabs = TRUE,
+    align = c("l"),
+    digits = 4
+  ) %>%
+  kableExtra::kable_styling(
+    bootstrap_options = c("striped", "condensed"),
+    font_size = 16
+  )
+
+test2 <- summary(APGRegression)$coefficients
+
+testdf2 <- data.frame(test2)
+testdf2 %>%
+  kable(
+    caption = "Coefficients of Assists Per Game as Predictor",
+    booktabs = TRUE,
+    align = c("l"),
+    digits = 4
+  ) %>%
+  kableExtra::kable_styling(
+    bootstrap_options = c("striped", "condensed"),
+    font_size = 16
+  )
+test3 <- summary(PPGRegression)$coefficients
+
+testdf3 <- data.frame(test3)
+testdf3 %>%
+  kable(
+    caption = "Coefficients of Points Per Game as Predictor",
+    booktabs = TRUE,
+    align = c("l"),
+    digits = 4
+  ) %>%
+  kableExtra::kable_styling(
+    bootstrap_options = c("striped", "condensed"),
+    font_size = 16
+  )
+test4 <- summary(BPGRegression)$coefficients
+
+testdf4 <- data.frame(test4)
+testdf4 %>%
+  kable(
+    caption = "Coefficients of Blocks Per Game as Predictor",
+    booktabs = TRUE,
+    align = c("l"),
+    digits = 4
+  ) %>%
+  kableExtra::kable_styling(
+    bootstrap_options = c("striped", "condensed"),
+    font_size = 16
+  )
+test5 <- summary(RPGRegression)$coefficients
+
+testdf5 <- data.frame(test5)
+testdf5 %>%
+  kable(
+    caption = "Coefficients of Rebounds Per Game as Predictor",
+    booktabs = TRUE,
+    align = c("l"),
+    digits = 4
+  ) %>%
+  kableExtra::kable_styling(
+    bootstrap_options = c("striped", "condensed"),
+    font_size = 16
+  )
+```
+
+From the regression summary, we can see how some physical features are related with in game performance.
+
+```{r visuals, results = 'hide'}
+
+#all visuals are given based on strongest p-value and correlation
+# rpg v height
+RPG <- ggplot(FinalTable1) +
+  aes(x = RPG, y = Height) +
+  geom_point(shape = "circle", size = 1) +
+  geom_smooth(method = "lm", span = 1L, se = F) +
+  labs(title = "Rebounds Per Game (RPG) and Height") +
+  theme_minimal() + 
+   theme(
+    plot.title = element_text(size = 10L)
+   )
+
+#bpg vs standing reach
+BPG <- ggplot(FinalTable1) +
+  aes(x = BPG, y = standReach) +
+  geom_point(shape = "circle", size = 1) +
+  geom_smooth(method = "lm", span = 1L, se = F) +
+  labs(
+    y = "Standing Reach",
+    title = "Blocks Per Game (BPG) and Standing Reach"
+  ) +
+  theme_minimal() + 
+   theme(
+    plot.title = element_text(size = 10L)
+   )
+
+#none for ppg as correlation is weak 
+
+# apg and wingspan
+APG <- ggplot(FinalTable1) +
+  aes(x = APG, y = Wingspan) +
+  geom_point(shape = "circle", size = 1) +
+  geom_smooth(method = "lm",span = 1L, se = F) +
+  labs(title = "Assists Per Game (APG) and Wingspan") +
+  theme_minimal() + 
+   theme(
+    plot.title = element_text(size = 10L)
+   )
+
+#none for spg as correlation is weak
+
+#join three together
+ggarrange(RPG, BPG, APG) + rremove("x.text")
+
+```
+Figure 7: Physical Attributes Effects on Performance Metrics
+
+
+The fitting of the linear regression models is visualized by these three graphs. With the fitting acting as a line of best fit, the relationship between physical features and in game stats can be seen. For example, the taller a player, the more blocks per game. The longer a players standing reach, the more average blocks per game. The longer a players wingspan, the less assists per game they average. 
+
+```{r visuals with pos, results = 'hide'}
+
+#make same tables, but show with respect to position
+RPGPos <- FinalTable1 %>%
+  subset(POS == "PG" | POS == "SG" | POS == "SF" | POS == "PF" | POS == "C") %>%
+  ggplot() +
+  aes(x = RPG, y = Height, colour = POS) +
+  geom_point(shape = "circle", size = 1) +
+  geom_smooth(method = "lm",span = 0.75, se = F) +
+  scale_color_hue(direction = 1) +
+  coord_cartesian(ylim = c(70, 85)) +
+  labs(title = "Rebounds per Game (RPG) and Height") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 10L)
+  )
+
+
+#bpg vs standing reach
+BPGPos <- FinalTable1 %>%
+  subset(POS == "PG" | POS == "SG" | POS == "SF" | POS == "PF" | POS == "C") %>%
+  ggplot() +
+  aes(x = BPG, y = standReach, colour = POS) +
+  geom_point(shape = "circle", size = 1) +
+  geom_smooth(method = "lm",span = 0.75, se = F) +
+  scale_color_hue(direction = 1) +
+  labs(
+    y = "Standing Reach",
+    title = "Blocks per Game (BPG) and Standing Reach"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 10L)
+  )
+
+
+#none for ppg as correlation is weak 
+
+# apg and wingspan
+APGPos <- FinalTable1 %>%
+  subset(POS == "PG" | POS == "SG" | POS == "SF" | POS == "PF" | POS == "C") %>%
+  ggplot() +
+  aes(x = APG, y = Wingspan, colour = POS) +
+  geom_point(shape = "circle", size = 1) +
+  geom_smooth(method = "lm",span = .75, se = F) +
+  scale_color_hue(direction = 1) +
+  labs(title = "Assist per Game (APG) and Wingspan") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 10L)
+  )
+
+
+ggarrange(RPGPos, BPGPos, APGPos) + rremove("x.text")
+
+```
+Figure 8: Physical Attributes Effects on Performance Metrics by Position
+
+These visualizations contain the same data as the prior group of visualizations, but now, a players position is used as a filter. This allows us to see the importance of features depending on a players position. For example, in Rebounds per Game and Height, for the point guard (PG) position, the taller the player, the more rebounds they get. The relationship is apparent and can be seen by the increasing green line. Looking at the Blocks per Game and Standing Reach visualization, it can be seen that standing reach matters more for point guards than any other position. Lastly, in the Assist per Game and Wingspan visualization, a greater wingspan is most detrimental to centers in the amount of assists they get.
+
+
+```{r}
+#Renaming badly named columns to better names
+FinalTable1 <- rename(FinalTable1, HandWidth = `HAND WIDTH (inches)`)
+FinalTable1 <- rename(FinalTable1, HandLength = `HAND LENGTH (inches)`)
+FinalTable1 <- rename(FinalTable1, Weight = `WEIGHT (LBS)`)
+```
+
+
+```{r}
+#Creating new dataframe with only needed variables
+modelDF <- FinalTable1 %>%
+  select(-c(`BODY FAT %`,  Player, `#`, FGA, FGM, `FG%`, `3PM`, `3PA`, `3P%`, FTM, FTA, OREB, DREB, EFF, TEAM, `FT%`, MIN, POS))
+```
+
+
+
+
+```{r}
+
+FinalTable1 %>%
+  subset(POS == "PG" | POS == "SG" | POS == "SF" | POS == "PF" | POS == "C") %>%
+ggplot() +
+  aes(x = Weight, y = MIN) +
+  geom_point(shape = "circle") +
+  geom_smooth(method = "lm", se = F, color = "red") +
+  facet_wrap(vars(POS), drop = T) +
+  labs(x = "Weight(lbs)",
+       y = "Minutes Per Game")
+
+```
+Figure 9: Weight Vs Minutes Per Game by Position
+
+I was expecting the heavier players to play less. I came to this assumption because the heavier you are, usually the less stamina you have combined with a higher chance for injury. But as you can see, that assumption was the opposite. Heavier players average more minutes across all positions.
+
+
+```{r}
+FinalTable1 %>%
+  subset(POS == "PG" | POS == "SG" | POS == "SF" | POS == "PF" | POS == "C") %>%
+ggplot() +
+  aes(x = Wingspan, y = EFF) +
+  geom_point(shape = "circle") +
+  geom_smooth(method = "lm", se = F, color = "red") +
+  facet_wrap(vars(POS), drop = T) +
+  labs(y = "Efficiency(EFF)")
+
+```
+Figure 10: Wingspan Vs Efficiency by Position
+
+Efficiency(EFF) is a common metric to rank players, it can be calculated by the equation EFF = PTS + STL + REB + AST + STL + BLK - Missed FG + Missed FT - TO / GP
+
+This visualization was one of the most interesting to me. This is because I always thought a greater wingspan was a huge advantage in any position. But it can be seen that wingspan, for the small positions, doesn't really matter. It is still important for the larger positions.
+
+```{r}
+FinalTable1 %>%
+  subset(POS == "PG" | POS == "SG" | POS == "SF" | POS == "PF" | POS == "C") %>%
+ggplot() +
+  aes(x = Height, y = EFF) +
+  geom_point(shape = "circle") +
+  geom_smooth(method = "lm", se = F, color = "red") +
+  facet_wrap(vars(POS), drop = T) +
+  labs(y = "Efficiency(EFF)")
+
+
+```
+Figure 11: Height Vs Efficiency by Position
+
+For the smaller positions (PG/SG) there is no correlation between height and efficiency.
+
+## LASSO
+
+```{r}
+modelDF <- modelDF %>%
+  na.omit()
+```
+
+```{r}
+modelDFCopy <- modelDF
+```
+
+```{r}
+Xmat <- model.matrix(PPG ~. -PPG, data=modelDF)[ ,-1]
+y <- modelDF$PPG
+```
+
+```{r}
+set.seed(123)
+train_ind <- sample(1:nrow(Xmat), floor(0.80*nrow(Xmat)))
+set.seed(NULL)
+
+X_mat_train <- Xmat[train_ind,]
+X_mat_test <- Xmat[-train_ind,]
+y_train <- y[train_ind]
+y_test <- y[-train_ind]
+
+```
+
+
+```{r}
+#lasso regression with 10 fold CV
+set.seed (123)
+cv.out <- cv.glmnet(x= Xmat, y = y, 
+                    alpha = 1, stanardize = TRUE,
+                    nfolds=10)
+plot(cv.out)
+```
+Figure 12: MSE vs log(Lambda)
+
+```{r}
+bestlam1 <- cv.out$lambda.min
+lasso.pred1 <- predict(cv.out , s = bestlam1,
+                      newx = Xmat)
+MSE_lassoMin <- mean((y - lasso.pred1)^2)
+RMSE_lassoMin <- sqrt(MSE_lassoMin)
+
+
+rmse1 <- data.frame(RMSE = RMSE_lassoMin)
+rmse1 %>%
+  kable(
+    caption = "RMSE of LASSO with Minimum Lambda",
+    booktabs = TRUE,
+    align = c("l"),
+    digits = 4
+  ) %>%
+  kableExtra::kable_styling(
+    bootstrap_options = c("striped", "condensed"),
+    font_size = 16
+  )
+```
+```{r}
+lasso.coef1 <- predict(cv.out , s = bestlam1,
+                      type = "coefficients")
+lasso.coef1
+```
+Figure 13: Coefficients of LASSO with Lambda that yields min MSE
+
+
+The variables that LASSO removed are: SPG, BPG, Weight, standReach, Height, PG, and PF.
+
+## Linear Regression
+
+```{r, class.source = 'fold-show'}
+#setting x variables and scaling them
+xvars <- c( "TO.", "RPG", "APG", "HandLength", "Wingspan", "HandWidth", "SG", "SF", "C")
+modelDFCopy[ , xvars] <- scale(modelDFCopy[ , xvars], center = TRUE, scale = TRUE)
+```
+
+```{r, class.source = 'fold-show'}
+#creating folds
+set.seed(123)
+folds <- cut(seq(1,nrow(modelDFCopy)),breaks=10,labels=FALSE)
+folds <- sample(folds)
+set.seed(NULL)
+```
+
+
+
+
+```{r, class.source = 'fold-show'}
+#10 fold CV for lm model
+mse_vec <- rep(NA, 10)
+for(i in 1:10){
+    testIndexes <- which(folds==i,arr.ind=TRUE)
+    Test <- modelDFCopy[testIndexes, ]
+    Train <- modelDFCopy[-testIndexes, ]
+    
+    modelNew <- lm(formula = PPG ~. -PPG, data = Train[, c("PPG", xvars)])
+    pred <- predict(modelNew, newdata = Test[, xvars])
+    
+    mse_vec[i] <- mean((Test$PPG-pred)^2)
+}
+```
+
+```{r}
+mseDF <- data.frame(mse_vec) %>%
+  summarise(MSE = mse_vec)
+
+rmse2 <- data.frame(RMSE = sqrt(mean(mseDF$MSE)))
+rmse2 %>%
+  kable(
+    caption = "RMSE of 10 Fold CV Linear Regression Model",
+    booktabs = TRUE,
+    align = c("l"),
+    digits = 4
+  ) %>%
+  kableExtra::kable_styling(
+    bootstrap_options = c("striped", "condensed"),
+    font_size = 16
+  )
+```
+## KNN Regression
+
+
+
+```{r, class.source = 'fold-show'}
+
+#creating data frame to store the mse values in
+maxK <- 50
+vecKnn <- rep(NA, maxK)
+testDf <- data.frame(1,2,3,4,5,6,7,8,9,10)
+
+#populating dataframe
+for (x in 1:50){
+  testDf[x,] <- NA
+}
+#adding k column
+testDf <- testDf %>%
+  mutate(k = 1:50,
+         .before = X1)
+
+#Start of mse calculations
+for(i in 1:10){
+    testIndexesKnn <- which(folds==i,arr.ind=TRUE)
+    TestKnn <- modelDFCopy[testIndexesKnn, ]
+    TrainKnn <- modelDFCopy[-testIndexesKnn, ]
+    
+    for (z in 1:maxK){
+      knn_res <- knn.reg(train = TrainKnn[,xvars, drop = F],
+                     test = TestKnn[,xvars, drop = F],
+                     y = TrainKnn$PPG,
+                     k = z)
+      vecKnn[z] <- mean((TestKnn$PPG - knn_res$pred)^2)
+      
+    }
+    testDf[,i+1] <- vecKnn
+}
+```
+
+```{r}
+rmse3 <- data.frame(RMSE = sqrt(vecKnn[which.min(vecKnn)]))
+rmse3 %>%
+  kable(
+    caption = "RMSE of 10 Fold CV KNN Regression Model with Tuned K value",
+    booktabs = TRUE,
+    align = c("l"),
+    digits = 4
+  ) %>%
+  kableExtra::kable_styling(
+    bootstrap_options = c("striped", "condensed"),
+    font_size = 16
+  )
+```
+
+
+```{r}
+
+meansDF <- testDf %>%
+  group_by(k) %>%
+  summarise(meanMSE = ((X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + X9 + X10) / 10),
+            sd = NA)
+
+ggplot(data = meansDF,
+       mapping = aes(x = k,
+                     y = meanMSE)) +
+  geom_line() +
+  labs(y = "MSE",
+       title = "MSE values of k")
+```
+
+Figure 14: k value vs MSE for KNN Regression Model
+
+## SVM Regression
+
+```{r, class.source = 'fold-show'}
+#10 fold CV SVM
+mse_vec2 <- rep(NA, 10)
+for(i in 1:10){
+    testIndexes <- which(folds==i,arr.ind=TRUE)
+    TestSVM <- modelDFCopy[testIndexes, ]
+    TrainSVM <- modelDFCopy[-testIndexes, ]
+    
+    svmModel <- train(PPG ~., method = "svmLinear", data = TrainSVM[, c("PPG", xvars)])
+    predictions <- predict(svmModel, newdata = TestSVM[, xvars])
+    mse_vec2[i] <- mean((TestSVM$PPG-predictions)^2)
+    
+}
+```
+
+```{r}
+mseDF2 <- data.frame(mse_vec2) %>%
+  summarise(MSE = mse_vec2)
+
+rmse3 <- data.frame(RMSE = sqrt(mean(mseDF2$MSE)))
+rmse3 %>%
+  kable(
+    caption = "RMSE of 10 Fold CV SVM Linear Model",
+    booktabs = TRUE,
+    align = c("l"),
+    digits = 4
+  ) %>%
+  kableExtra::kable_styling(
+    bootstrap_options = c("striped", "condensed"),
+    font_size = 16
+  )
+```
+
+```{r}
+#combining predictions of LM,KNN and SVM models and averaging them
+ensemblePred <- (knn_res$pred + predictions + pred) / 3
+
+
+rmse4 <- data.frame(RMSE = rmse(ensemblePred, Test$PPG))
+rmse4 %>%
+  kable(
+    caption = "RMSE of Ensemble Model Consisting of lm, SVM, and KNN",
+    booktabs = TRUE,
+    align = c("l"),
+    digits = 4
+  ) %>%
+  kableExtra::kable_styling(
+    bootstrap_options = c("striped", "condensed"),
+    font_size = 16
+  )
+```
+Because I was not familiar with creating an ensemble in r, I used chat GPT to help me make code for the ensemble model.
+
+## Classification
+
+```{r, eval=FALSE}
+mean(FinalTable1$EFF)
+```
+```{r}
+#Adding "Good" column (indicator variable) if a players efficiency rating is above average
+FinalTable1 <- FinalTable1 %>%
+  mutate(Good = ifelse(EFF >= mean(EFF)-.1, 1, 0))
+```
+
+
+```{r, class.source = 'fold-show'}
+glmModelDF <- FinalTable1 %>%
+  select(Height, Weight, Wingspan, HandLength, HandWidth, POS, Good) %>%
+  na.omit()
+  
+model1 <- glm(Good ~ Height + Weight + Wingspan + HandLength + HandWidth + POS, family = binomial, data = glmModelDF)
+threshold <- 0.5
+pred_prob <- predict(model1, newdata = glmModelDF, type = "response")
+pred_surv <- ifelse(pred_prob > threshold, "Yes", "No")
+```
+
+```{r}
+test_roc <- roc(response = glmModelDF$Good,
+                predictor = pred_prob,
+                plot = TRUE,
+                print.auc = TRUE,
+                legacy.axes = TRUE)
+```
+Figure 15: AUC-ROC Curve
+
+In normal circumstances, a AUC of .606 inst good, but it is interesting that given only physical features about a player, there is a 60% chance that you can predict if they will have an above average efficiency rating.
+
+## Methods
+For the machine learning aspect of this project, I was mainly focused on predicting a players performance. For the regression models, this was in the form of predicting Points Per Game. For the classification model, this was predicting if a player would have a better than average Efficiency rating. I started by doing some intuitive feature selection, because I have a bit of background knowledge of basketball, I had an idea of which variables I wanted to use for this project. My goal of this project wasn't to get the best model score, it was to learn something. Because of this, I removed many of the variables from the dataset that were basically functions of the predictor. After I was left with the features that could give insight, I created a LASSO model for feature selection, with the selection of lambda being the one which yielded the minimum MSE.The features that the LASSO model selected to remove were: Steals Per Game, Blocks Per Game, Weight, Standing Reach, Height, Point Guard(Indicator Variable), and Power Forward(Indicator Variable). This left me with the features: Rebounds Per Game, Assists Per Game, Turnovers Per Game, Hand Length, Hand Width, Wingspan, Shooting Guard(Indicator Variable), Small Forward(Indicator Variable), and Center(Indicator Variable) to train the models on. I created three models that combined into an ensemble which then took the average of the three predictions. These models were linear regression, KNN regression, and SVM linear. All three of these models were trained on a randomized 10 fold cross validation of the data which was then scaled. After I obtained a final RMSE of 2.0443 for the ensemble, I wanted to experiment with one more thing. In the original dataset there was a feature called EFF(Efficiency), which is a basic metric to rank a players performance. I took the average EFF rating and created an indicator variable called "Good" which had a value of 1 if the player had an above average EFF and 0 if below. I then trained a logistic regression model with a threshold of .5, on the data with the "Good" variable as the predictor and the only features that the model was trained on were physical features. The features were: Height, Weight, Wingspan, HandLength, HandWidth, and Position.
+
+## Reuslts
+
+There were many things I learned about basketball from this project. Starting with the EDA, in figure 8, it can be seen, how detrimental a greater wingspan is to a center's assists per game. Something else that is interesting is how important standing reach is for a point guard's shot blocking ability. In Figure 9, looking at the relationship between Weight and Minutes Per Game. I had always thought that the heavier a player was, the less time they would spend on the court. I came to this assumption because the more weight someone has, the less stamina they have, along with a greater chance of injury. So it is in a teams best interest to have the heavier players play less minutes. But, as can be seen by the visualization, there is a positive correlation between weight and minutes per game across every position, showing that the results were the complete opposite of my assumption. Next, in figure 10 which looks at the relationship between Wingspan and a players Efficiency rating. I had always thought that wingspan was an extremely important feature for every position, and with all else equal, the player with the larger wingspan would be better. Looking at the visualization, this assumption is partly correct but I was shocked to find that for the smaller positions(Point Guard(PG) and Shooting Guard(SG)), there was no correlation between wingspan and efficiency. Moving on to the machine learning results, the RMSE for the lm model with 10 fold CV was 2.195. The RMSE for the 10 fold CV KNN Regression model with a tuned k value was 2.0344. The final regression model, 10 fold CV SVM regression, had an RMSE of 2.1997. I combined these models into an ensemble, averaging each of the predictions for the final prediction which gave a RMSE of 2.0292. This means that, with the variables mentioned in the Methods section, the model can predict a players points per game to within 2.0292 points on average. For my final task I wanted to see if variables that a player had no control over could be used to predict their success. This was accomplished with a logistic regression model which gave an AUC of .606. Under normal circumstances, that is not a good result but given the situation, it provides some insight. The question I was most interested in was, can you predict a players success based on features they have no control over? Although it was not as apparent as I would have liked, an AUC of .606 means that there is a 60.6% chance that the model can predict if a player is above average just based on physical features alone.
+
+## Conclusion
+
+The goal of this project was to use the power of analytics and machine learning to increase my understanding of what goes into a players performance in the NBA. I am more than pleased with the results I got, as I learned many things along the way. Although the models results were not extremely impressive, the goal of this project wasn't to explore a topic that I knew would give good results, I wanted to try something that I wasn't sure would work. In terms of the future of this project, I would like to experiment with incorporating different datasets, maybe ones that are about NBA players but not directly about basketball. For example, does where a player lives, or how much money they make, or the location of the game, effect their in game performance. Overall, this project taught me many new things about the game of basketball and changed some of my prior assumptions about the game.
+
+
+## Code Appendix
+```{r ref.label=knitr::all_labels(), echo=TRUE, eval=FALSE}
+```
